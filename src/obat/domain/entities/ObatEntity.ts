@@ -1,0 +1,33 @@
+export default interface ObatEntity {
+  kode: string;
+  nama: string;
+  kategori: string | null;
+  stok: number;
+  satuanBeli: string | null;
+  hargaBeli: number | null;
+  stokMin: number | null;
+  satuan1: string | null;
+  satuan2: string | null;
+  satuan3: string | null;
+  satuan4: string | null;
+  isi1: number | null;
+  isi2: number | null;
+  isi3: number | null;
+  isi4: number | null;
+  hargaJual1: number | null;
+  hargaJual2: number | null;
+  hargaJual3: number | null;
+  hargaJual4: number | null;
+  hargaResep1: number | null;
+  hargaResep2: number | null;
+  hargaResep3: number | null;
+  hargaResep4: number | null;
+  labaOtomatis: number | null;
+  suplier: string | null;
+  pabrik: string | null;
+  expired: string | null;
+  indikasi: string | null;
+  komposisi: string | null;
+  lokasi: string | null;
+  noBatch: string | null;
+}
