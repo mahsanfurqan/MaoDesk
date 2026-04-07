@@ -12,8 +12,9 @@ declare global {
 }
 
 export type RootStackParamList = {
-  Obats: undefined;
+  Obats: { refreshAt?: number } | undefined;
   Obat: { kode: string };
+  ObatForm: { kode?: string } | undefined;
   Posts: undefined;
   Post: { id: number };
   NotFound: undefined;

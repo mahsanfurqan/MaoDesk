@@ -13,6 +13,7 @@ const linking: LinkingOptions<RootStackParamList> = {
   config: {
     screens: {
       Obats: "",
+      ObatForm: "obat/form",
       Obat: "obat/:kode",
       Posts: "posts",
       Post: "post/:id",

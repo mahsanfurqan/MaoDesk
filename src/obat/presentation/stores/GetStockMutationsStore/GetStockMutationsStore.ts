@@ -1,29 +1,29 @@
 import { inject, injectable } from "inversiland";
 import { makeAutoObservable } from "mobx";
-import GetObatStoreState from "src/obat/presentation/types/GetObatStoreState";
-import GetObatPayload from "src/obat/application/types/GetObatPayload";
-import GetObatUseCase from "src/obat/application/useCases/GetObatUseCase";
-import GetObatRequestOptions from "src/obat/presentation/types/GetObatRequestOptions";
-import CachedObatPage from "src/obat/presentation/types/CachedObatPage";
+import GetStockMutationsPayload from "src/obat/application/types/GetStockMutationsPayload";
+import GetStockMutationsUseCase from "src/obat/application/useCases/GetStockMutationsUseCase";
+import GetStockMutationsStoreState from "src/obat/presentation/types/GetStockMutationsStoreState";
 import { parseObatErrorMessage } from "src/obat/presentation/stores/utils/parseObatErrorMessage";
+import GetStockMutationsRequestOptions from "src/obat/presentation/types/GetStockMutationsRequestOptions";
+import CachedStockMutationPage from "src/obat/presentation/types/CachedStockMutationPage";
 
 @injectable()
-export class GetObatStore implements GetObatStoreState {
+export class GetStockMutationsStore implements GetStockMutationsStoreState {
   isLoading = false;
   isRefreshing = false;
   errorMessage: string | null = null;
-  results = [] as GetObatStoreState["results"];
+  results = [] as GetStockMutationsStoreState["results"];
   count = 0;
-  filters: GetObatStoreState["filters"] = {};
+  filters: GetStockMutationsStoreState["filters"] = {};
   pagination = {
     page: 1,
-    pageSize: 20,
+    pageSize: 10,
   };
-  private readonly pageCache = new Map<string, CachedObatPage>();
+  private readonly pageCache = new Map<string, CachedStockMutationPage>();
 
   constructor(
-    @inject(GetObatUseCase)
-    private readonly getObatUseCase: GetObatUseCase
+    @inject(GetStockMutationsUseCase)
+    private readonly getStockMutationsUseCase: GetStockMutationsUseCase
   ) {
     makeAutoObservable(this);
   }
@@ -48,19 +48,17 @@ export class GetObatStore implements GetObatStoreState {
     this.errorMessage = errorMessage;
   };
 
-  setResults = (results: GetObatStoreState["results"]) => {
+  setResults = (results: GetStockMutationsStoreState["results"]) => {
     this.results = results;
   };
 
-  setCount = (count: GetObatStoreState["count"]) => {
+  setCount = (count: GetStockMutationsStoreState["count"]) => {
     this.count = count;
   };
 
-  mergeFilters = (payload: Partial<GetObatStoreState["filters"]>) => {
-    Object.assign(this.filters, payload);
-  };
-
-  mergePagination = (payload: Partial<GetObatStoreState["pagination"]>) => {
+  mergePagination = (
+    payload: Partial<GetStockMutationsStoreState["pagination"]>
+  ) => {
     Object.assign(this.pagination, payload);
   };
 
@@ -68,29 +66,40 @@ export class GetObatStore implements GetObatStoreState {
     this.pageCache.clear();
   };
 
-  private getPayload(): GetObatPayload {
+  private getPayload(kode: string): GetStockMutationsPayload {
     return {
-      ...this.filters,
+      kode,
       ...this.pagination,
     };
   }
 
-  private getCacheKey(payload: GetObatPayload) {
+  private getCacheKey(payload: GetStockMutationsPayload) {
     return JSON.stringify({
+      kode: payload.kode,
       page: payload.page,
       pageSize: payload.pageSize,
-      search: payload.search ?? "",
-      kategori: payload.kategori ?? "",
     });
   }
 
-  private setResponse(response: CachedObatPage) {
+  private setResponse(response: CachedStockMutationPage) {
     this.setResults(response.results);
     this.setCount(response.count);
   }
 
-  async getObat(options: GetObatRequestOptions = {}) {
-    const payload = this.getPayload();
+  async getStockMutations(
+    kode: string,
+    options: GetStockMutationsRequestOptions = {}
+  ) {
+    const normalizedKode = kode.trim();
+
+    if (!normalizedKode) {
+      this.setResults([]);
+      this.setCount(0);
+
+      return;
+    }
+
+    const payload = this.getPayload(normalizedKode);
     const cacheKey = this.getCacheKey(payload);
     const cachedPage = this.pageCache.get(cacheKey);
     const { forceRefresh = false, showLoading = true } = options;
@@ -108,7 +117,7 @@ export class GetObatStore implements GetObatStoreState {
 
     this.setErrorMessage(null);
 
-    return this.getObatUseCase
+    return this.getStockMutationsUseCase
       .execute(payload)
       .then((response) => {
         this.pageCache.set(cacheKey, {
@@ -129,11 +138,11 @@ export class GetObatStore implements GetObatStoreState {
       });
   }
 
-  async refreshObat() {
+  async refreshStockMutations(kode: string) {
     this.setIsRefreshing(true);
     this.clearCache();
 
-    return this.getObat({
+    return this.getStockMutations(kode, {
       forceRefresh: true,
       showLoading: false,
     }).finally(() => {

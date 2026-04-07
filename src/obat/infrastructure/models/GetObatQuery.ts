@@ -15,6 +15,11 @@ export default class GetObatQuery extends PayloadDto<GetObatPayload> {
   @Expose()
   kategori?: string;
 
+  constructor(payload: GetObatPayload) {
+    super(payload);
+    Object.assign(this, this.transform(payload));
+  }
+
   transform(payload: GetObatPayload) {
     return {
       page: Math.max(1, payload.page),

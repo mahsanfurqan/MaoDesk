@@ -5,6 +5,7 @@ import NotFoundScreen from "../screens/NotFoundScreen";
 import PostsScreen from "src/post/presentation/screens/PostsScreen";
 import ObatsScreen from "src/obat/presentation/screens/ObatsScreen";
 import ObatScreen from "src/obat/presentation/screens/ObatScreen";
+import ObatFormScreen from "src/obat/presentation/screens/ObatFormScreen";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -16,6 +17,8 @@ export default function RootNavigator() {
       <Stack.Screen name="Obats" component={ObatsScreen} />
 
       <Stack.Screen name="Obat" component={ObatScreen} />
+
+      <Stack.Screen name="ObatForm" component={ObatFormScreen} />
 
       <Stack.Screen name="Posts" component={PostsScreen} />
 

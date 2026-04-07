@@ -5,6 +5,9 @@
   "scripts": {
     "prepare": "husky install",
     "start": "npx expo start",
+    "go": "npx expo start --go",
+    "go:android": "npx expo start --go --android",
+    "go:android:clear": "npx expo start --go --android --clear",
     "web": "npx expo start --web",
     "android": "npx expo run:android",
     "ios": "npx expo run:ios",

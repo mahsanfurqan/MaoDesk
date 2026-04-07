@@ -1,21 +1,28 @@
+import { useNavigation } from "@react-navigation/native";
 import { observer } from "mobx-react";
 import { useEffect, useRef, useState } from "react";
 import {
   FlatList,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import {
+  RootScreenNavigationProp,
+  RootStackScreenProps,
+} from "src/core/presentation/navigation/types";
 import { useI18n } from "src/core/presentation/hooks/useI18n";
 import { withProviders } from "src/core/presentation/utils/withProviders";
 import ObatItem from "../components/ObatItem";
+import ObatsFiltersSection from "../components/ObatsFiltersSection";
+import ObatsPaginationControls from "../components/ObatsPaginationControls";
 import { GetObatStoreProvider } from "../stores/GetObatStore/GetObatStoreProvider";
 import { useGetObatStore } from "../stores/GetObatStore/useGetObatStore";
 
-const ObatsScreen = observer(() => {
+const ObatsScreen = observer(({ route }: RootStackScreenProps<"Obats">) => {
   const i18n = useI18n();
+  const navigation = useNavigation<RootScreenNavigationProp<"Obats">>();
   const getObatStore = useGetObatStore();
   const { isLoading, isRefreshing, errorMessage, results, pagination, pageCount } =
     getObatStore;
@@ -26,6 +33,14 @@ const ObatsScreen = observer(() => {
   useEffect(() => {
     getObatStore.getObat().catch(() => undefined);
   }, [getObatStore]);
+
+  useEffect(() => {
+    if (!route.params?.refreshAt) {
+      return;
+    }
+
+    getObatStore.refreshObat().catch(() => undefined);
+  }, [route.params?.refreshAt, getObatStore]);
 
   useEffect(() => {
     if (!hasInitializedDebounce.current) {
@@ -73,50 +88,28 @@ const ObatsScreen = observer(() => {
     getObatStore.getObat({ forceRefresh: true }).catch(() => undefined);
   };
 
+  const onCreateObat = () => {
+    navigation.navigate("ObatForm");
+  };
+
   const goToPage = (page: number) => {
     getObatStore.mergePagination({ page });
     getObatStore.getObat().catch(() => undefined);
   };
 
-  const canGoPrevious = pagination.page > 1;
-  const safePageCount = Math.max(pageCount, 1);
-  const canGoNext = pagination.page < safePageCount;
   const showInitialLoading = isLoading && results.length === 0;
 
   return (
     <View style={styles.container}>
-      <View style={styles.filtersContainer}>
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder={i18n.t("obat.screens.Obats.searchPlaceholder")}
-          style={styles.searchInput}
-        />
-
-        <TextInput
-          value={kategori}
-          onChangeText={setKategori}
-          placeholder={i18n.t("obat.screens.Obats.kategoriPlaceholder")}
-          style={styles.searchInput}
-        />
-
-        <View style={styles.filterActionsContainer}>
-          <TouchableOpacity
-            onPress={onClearFilters}
-            style={styles.secondaryButton}
-          >
-            <Text style={styles.secondaryButtonText}>
-              {i18n.t("obat.screens.Obats.clearFilters")}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={onRefresh} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>
-              {i18n.t("obat.screens.Obats.refresh")}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <ObatsFiltersSection
+        search={search}
+        kategori={kategori}
+        onSearchChange={setSearch}
+        onKategoriChange={setKategori}
+        onCreateObat={onCreateObat}
+        onClearFilters={onClearFilters}
+        onRefresh={onRefresh}
+      />
 
       {errorMessage ? (
         <View style={styles.errorBanner}>
@@ -151,40 +144,12 @@ const ObatsScreen = observer(() => {
             }
           />
 
-          <View style={styles.paginationContainer}>
-            <TouchableOpacity
-              disabled={!canGoPrevious}
-              onPress={() => goToPage(pagination.page - 1)}
-              style={[
-                styles.paginationButton,
-                !canGoPrevious && styles.paginationButtonDisabled,
-              ]}
-            >
-              <Text style={styles.paginationButtonText}>
-                {i18n.t("obat.screens.Obats.prev")}
-              </Text>
-            </TouchableOpacity>
-
-            <Text style={styles.pageText}>
-              {i18n.t("obat.screens.Obats.page", {
-                page: pagination.page,
-                pageCount: safePageCount,
-              })}
-            </Text>
-
-            <TouchableOpacity
-              disabled={!canGoNext}
-              onPress={() => goToPage(pagination.page + 1)}
-              style={[
-                styles.paginationButton,
-                !canGoNext && styles.paginationButtonDisabled,
-              ]}
-            >
-              <Text style={styles.paginationButtonText}>
-                {i18n.t("obat.screens.Obats.next")}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <ObatsPaginationControls
+            page={pagination.page}
+            pageCount={pageCount}
+            onPrevious={() => goToPage(pagination.page - 1)}
+            onNext={() => goToPage(pagination.page + 1)}
+          />
         </View>
       )}
     </View>
@@ -196,35 +161,6 @@ export default withProviders(GetObatStoreProvider)(ObatsScreen);
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  filtersContainer: {
-    padding: 12,
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  filterActionsContainer: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  secondaryButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#c5d3ec",
-    backgroundColor: "#f4f7ff",
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 10,
-  },
-  secondaryButtonText: {
-    color: "#1d4fa8",
-    fontWeight: "600",
   },
   errorBanner: {
     marginHorizontal: 12,
@@ -250,30 +186,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 24,
     color: "#777",
-  },
-  paginationContainer: {
-    borderTopWidth: 1,
-    borderTopColor: "#eee",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  paginationButton: {
-    backgroundColor: "#0b6efe",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  paginationButtonDisabled: {
-    backgroundColor: "#acc8ff",
-  },
-  paginationButtonText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  pageText: {
-    fontWeight: "500",
   },
 });

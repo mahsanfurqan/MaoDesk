@@ -1,29 +1,61 @@
 import { observer } from "mobx-react";
-import { useEffect } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, ScrollView, StyleSheet, Text } from "react-native";
 import { RootStackScreenProps } from "src/core/presentation/navigation/types";
 import { useI18n } from "src/core/presentation/hooks/useI18n";
 import { withProviders } from "src/core/presentation/utils/withProviders";
+import { StockMutationType } from "src/obat/domain/entities/StockMutationEntity";
+import ObatActionsSection from "../components/ObatActionsSection";
+import ObatDetailRowsSection from "../components/ObatDetailRowsSection";
+import StockMutationFormSection from "../components/StockMutationFormSection";
+import StockMutationHistorySection from "../components/StockMutationHistorySection";
 import { FindObatStoreProvider } from "../stores/FindObatStore/FindObatStoreProvider";
 import { useFindObatStore } from "../stores/FindObatStore/useFindObatStore";
+import { GetStockMutationsStoreProvider } from "../stores/GetStockMutationsStore/GetStockMutationsStoreProvider";
+import { useGetStockMutationsStore } from "../stores/GetStockMutationsStore/useGetStockMutationsStore";
+import { DeleteObatStoreProvider } from "../stores/DeleteObatStore/DeleteObatStoreProvider";
+import { useDeleteObatStore } from "../stores/DeleteObatStore/useDeleteObatStore";
+import { AdjustStockStoreProvider } from "../stores/AdjustStockStore/AdjustStockStoreProvider";
+import { useAdjustStockStore } from "../stores/AdjustStockStore/useAdjustStockStore";
 
-const toText = (value: unknown) => {
-  if (value === null || value === undefined || value === "") {
-    return "-";
-  }
-
-  return String(value);
-};
-
-const ObatScreen = observer(({ route }: RootStackScreenProps<"Obat">) => {
+const ObatScreen = observer(({ route, navigation }: RootStackScreenProps<"Obat">) => {
   const { kode } = route.params;
   const i18n = useI18n();
   const findObatStore = useFindObatStore();
+  const getStockMutationsStore = useGetStockMutationsStore();
+  const deleteObatStore = useDeleteObatStore();
+  const adjustStockStore = useAdjustStockStore();
+  const [mutationType, setMutationType] = useState<StockMutationType>("masuk");
+  const [mutationAmount, setMutationAmount] = useState("");
+  const [mutationNote, setMutationNote] = useState("");
+  const [localMutationError, setLocalMutationError] = useState<string | null>(null);
   const { isLoading, obat } = findObatStore;
+  const isSubmitting =
+    deleteObatStore.isSubmitting || adjustStockStore.isSubmitting;
+  const deleteErrorMessage = deleteObatStore.errorMessage;
+  const adjustErrorMessage = adjustStockStore.errorMessage;
+  const {
+    isLoading: isLoadingMutations,
+    isRefreshing: isRefreshingMutations,
+    errorMessage: stockMutationError,
+    results: stockMutations,
+    pagination: stockMutationPagination,
+    pageCount: stockMutationPageCount,
+  } = getStockMutationsStore;
 
   useEffect(() => {
     findObatStore.findObat(kode);
-  }, [findObatStore, kode]);
+    getStockMutationsStore.getStockMutations(kode).catch(() => undefined);
+  }, [findObatStore, getStockMutationsStore, kode]);
+
+  const onRefreshStockMutations = () => {
+    getStockMutationsStore.refreshStockMutations(kode).catch(() => undefined);
+  };
+
+  const onMutationPageChange = (page: number) => {
+    getStockMutationsStore.mergePagination({ page });
+    getStockMutationsStore.getStockMutations(kode).catch(() => undefined);
+  };
 
   if (isLoading) {
     return <Text>{i18n.t("obat.screens.Obat.loading")}</Text>;
@@ -32,6 +64,87 @@ const ObatScreen = observer(({ route }: RootStackScreenProps<"Obat">) => {
   if (!obat) {
     return <Text>{i18n.t("obat.screens.Obat.notFound")}</Text>;
   }
+
+  const onEdit = () => {
+    navigation.navigate("ObatForm", {
+      kode: obat.kode,
+    });
+  };
+
+  const onDelete = () => {
+    Alert.alert(
+      i18n.t("obat.screens.Obat.deleteConfirmTitle"),
+      i18n.t("obat.screens.Obat.deleteConfirmMessage", {
+        kode: obat.kode,
+      }),
+      [
+        {
+          text: i18n.t("obat.screens.Obat.deleteConfirmCancel"),
+          style: "cancel",
+        },
+        {
+          text: i18n.t("obat.screens.Obat.deleteConfirmAccept"),
+          style: "destructive",
+          onPress: () => {
+            deleteObatStore
+              .deleteObat(obat.kode)
+              .then(() => {
+                navigation.replace("Obats", {
+                  refreshAt: Date.now(),
+                });
+              })
+              .catch(() => undefined);
+          },
+        },
+      ]
+    );
+  };
+
+  const onSubmitStockMutation = () => {
+    const parsedAmount = Number(mutationAmount);
+
+    if (Number.isNaN(parsedAmount)) {
+      setLocalMutationError(i18n.t("obat.screens.Obat.stockMutation.invalidAmount"));
+
+      return;
+    }
+
+    if (mutationType === "koreksi" && parsedAmount < 0) {
+      setLocalMutationError(
+        i18n.t("obat.screens.Obat.stockMutation.invalidKoreksiAmount")
+      );
+
+      return;
+    }
+
+    if (mutationType !== "koreksi" && parsedAmount <= 0) {
+      setLocalMutationError(i18n.t("obat.screens.Obat.stockMutation.invalidAmount"));
+
+      return;
+    }
+
+    setLocalMutationError(null);
+
+    adjustStockStore
+      .adjustStock({
+        kode: obat.kode,
+        tipe: mutationType,
+        jumlah: parsedAmount,
+        catatan: mutationNote.trim() || null,
+      })
+      .then(() => {
+        setMutationAmount("");
+        setMutationNote("");
+
+        return Promise.all([
+          findObatStore.findObat(kode),
+          getStockMutationsStore.refreshStockMutations(kode),
+        ]);
+      })
+      .catch(() => undefined);
+  };
+
+  const mutationErrorMessage = localMutationError ?? adjustErrorMessage;
 
   const rows: Array<[string, unknown]> = [
     ["kode", obat.kode],
@@ -69,36 +182,52 @@ const ObatScreen = observer(({ route }: RootStackScreenProps<"Obat">) => {
 
   return (
     <ScrollView style={styles.container}>
-      {rows.map(([label, value]) => (
-        <View key={label} style={styles.row}>
-          <Text style={styles.label}>{label}</Text>
-          <Text style={styles.value}>{toText(value)}</Text>
-        </View>
-      ))}
+      <ObatActionsSection
+        onEdit={onEdit}
+        onDelete={onDelete}
+        isSubmitting={isSubmitting}
+        isDeleting={deleteObatStore.isSubmitting}
+        deleteErrorMessage={deleteErrorMessage}
+      />
+
+      <StockMutationFormSection
+        mutationType={mutationType}
+        mutationAmount={mutationAmount}
+        mutationNote={mutationNote}
+        mutationErrorMessage={mutationErrorMessage}
+        isSubmitting={isSubmitting}
+        onMutationTypeChange={setMutationType}
+        onMutationAmountChange={setMutationAmount}
+        onMutationNoteChange={setMutationNote}
+        onSubmit={onSubmitStockMutation}
+      />
+
+      <StockMutationHistorySection
+        isLoading={isLoadingMutations}
+        isRefreshing={isRefreshingMutations}
+        errorMessage={stockMutationError}
+        stockMutations={stockMutations}
+        pagination={stockMutationPagination}
+        pageCount={stockMutationPageCount}
+        onRefresh={onRefreshStockMutations}
+        onPageChange={onMutationPageChange}
+      />
+
+      <ObatDetailRowsSection rows={rows} />
     </ScrollView>
   );
 });
 
-export default withProviders(FindObatStoreProvider)(ObatScreen);
+export default withProviders(
+  FindObatStoreProvider,
+  DeleteObatStoreProvider,
+  AdjustStockStoreProvider,
+  GetStockMutationsStoreProvider
+)(ObatScreen);
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 12,
-  },
-  row: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  label: {
-    fontSize: 12,
-    color: "#666",
-    textTransform: "uppercase",
-  },
-  value: {
-    marginTop: 4,
-    fontSize: 15,
-    color: "#111",
   },
 });

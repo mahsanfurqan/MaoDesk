@@ -9,6 +9,11 @@ export default class GetPostsQuery extends PayloadDto<GetPostsPayload> {
   @Expose()
   pageSize!: number;
 
+  constructor(payload: GetPostsPayload) {
+    super(payload);
+    Object.assign(this, this.transform(payload));
+  }
+
   transform(payload: GetPostsPayload) {
     return {
       page: payload.page,
